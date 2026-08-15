@@ -67,6 +67,22 @@ function nextClockFormat(ring, current) {
   return ring[(index + 1) % ring.length]
 }
 
+// The 12-hour twin of a format: 24-hour hour tokens become their 12-hour
+// forms and the format gains Qt's AP marker, so 'HH:mm' reads as 'h:mm AP'.
+// Formats already on a 12-hour clock (carrying an unquoted A or AP) come
+// back unchanged, as do date-only formats with no hour token to convert.
+function to12HourFormat(format) {
+  var text = String(format === undefined || format === null ? "" : format)
+  if (text === "") return text
+
+  // Qt spells AM/PM as A or AP; a quoted 'A' is a literal and is skipped.
+  if (/A/.test(text.replace(/'[^']*'/g, ""))) return text
+
+  var converted = text.replace(/HH/g, "h").replace(/hh/g, "h").replace(/H/g, "h")
+  if (converted === text) return text
+  return converted + " AP"
+}
+
 // Two-digit ISO week, substituted into a format's 'ww' token before Qt
 // formats it -- Qt has no ISO week specifier of its own.
 function isoWeekLiteral(year, month, day) {
@@ -291,6 +307,7 @@ if (typeof module !== "undefined") {
     clockFormats: clockFormats,
     clockFormatRing: clockFormatRing,
     nextClockFormat: nextClockFormat,
+    to12HourFormat: to12HourFormat,
     isoWeekLiteral: isoWeekLiteral
   }
 }

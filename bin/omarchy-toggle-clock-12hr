@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# omarchy:summary=Toggle 12-hour time display on the bar clock
+# omarchy:args=[toggle|on|off|status]
+# omarchy:examples=omarchy toggle clock 12hr | omarchy toggle clock 12hr on | omarchy toggle clock 12hr --status
+
+ipc() {
+  omarchy-shell omarchy.clock "$@"
+}
+
+is_12hr() {
+  [[ $(ipc is12hr 2>/dev/null) == "true" ]]
+}
+
+print_status() {
+  if is_12hr; then
+    printf '{"enabled":true,"class":"enabled","tooltip":"12-hour clock"}\n'
+  else
+    printf '{"enabled":false,"class":"disabled","tooltip":"24-hour clock"}\n'
+  fi
+}
+
+case "${1:-toggle}" in
+  toggle)
+    ipc toggle12hr
+    ;;
+  on)
+    is_12hr || ipc toggle12hr
+    ;;
+  off)
+    is_12hr && ipc toggle12hr
+    ;;
+  status|--status)
+    print_status
+    ;;
+  *)
+    echo "Usage: omarchy-toggle-clock-12hr [toggle|on|off|status]" >&2
+    exit 1
+    ;;
+esac

@@ -122,6 +122,10 @@ assert_output_contains "bare group includes browser route" "$output" "omarchy in
 output=$("$CLI" toggle)
 assert_output_contains "bare root command with children renders help" "$output" "Toggle commands"
 assert_output_contains "bare toggle help includes child route" "$output" "omarchy toggle nightlight"
+assert_output_contains "bare toggle help includes clock route" "$output" "omarchy toggle clock 12hr"
+
+"$CLI" commands --json | jq -e '.commands[] | select(.binary == "omarchy-toggle-clock-12hr" and .route == "omarchy toggle clock 12hr" and .summary == "Toggle 12-hour time display on the bar clock")' >/dev/null
+pass "clock 12hr toggle registers under the toggle group"
 
 output=$("$CLI" pkg --help)
 assert_output_contains "package group includes pkg add fallback route" "$output" "omarchy pkg add <packages...>"

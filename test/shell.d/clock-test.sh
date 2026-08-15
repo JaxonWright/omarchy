@@ -166,6 +166,21 @@ assertEqual(
 )
 assertEqual(calendar.isoWeekLiteral(2026, 0, 5), '02', 'clock zero-pads the ISO week token')
 
+// ---- 12-hour toggle
+assertEqual(calendar.to12HourFormat('HH:mm'), 'h:mm AP', 'clock converts a bare 24-hour time to its 12-hour twin')
+assertEqual(calendar.to12HourFormat('dddd HH:mm'), 'dddd h:mm AP', 'clock converts a date-plus-time format')
+assertEqual(calendar.to12HourFormat('ddd d MMM HH:mm'), 'ddd d MMM h:mm AP', 'clock converts the weekday format too')
+assertEqual(calendar.to12HourFormat('yyyy-MM-dd HH:mm'), 'yyyy-MM-dd h:mm AP', 'clock converts a hand-written ISO time')
+assertEqual(calendar.to12HourFormat('H:mm'), 'h:mm AP', 'clock converts a no-leading-zero 24-hour hour')
+assertEqual(calendar.to12HourFormat('hh:mm'), 'h:mm AP', 'clock normalizes a leading-zero 12-hour hour')
+assertEqual(calendar.to12HourFormat('HH\n\u2014\nmm'), 'h\n\u2014\nmm AP', 'clock converts the stacked vertical format')
+assertEqual(calendar.to12HourFormat('h:mm AP'), 'h:mm AP', 'clock leaves a 12-hour format alone')
+assertEqual(calendar.to12HourFormat('dddd h:mm AP'), 'dddd h:mm AP', 'clock leaves an AM/PM date format alone')
+assertEqual(calendar.to12HourFormat("d MMMM 'W'ww yyyy"), "d MMMM 'W'ww yyyy", 'clock leaves a date-only format alone')
+assertEqual(calendar.to12HourFormat(''), '', 'clock passes through an empty format')
+assertEqual(calendar.to12HourFormat(undefined), '', 'clock passes through an unset format')
+assertEqual(calendar.to12HourFormat(null), '', 'clock passes through a null format')
+
 // ---- widget wiring
 assert(/moduleName: "omarchy\.clock"/.test(panelSource), 'calendar panel declares its module name')
 assert(/ipcTarget: "omarchy\.clock"/.test(panelSource), 'calendar panel registers its IPC target')
@@ -209,7 +224,11 @@ assert(/if \(root\.editingLife\) root\.cancelEditingLife\(\)/.test(panelSource),
 assert(/source: Qt\.resolvedUrl\("Panel\.qml"\)/.test(widgetSource), 'clock widget hosts the calendar panel')
 assert(/readonly property bool opened:/.test(widgetSource), 'clock widget exposes the panel open state to shell routing')
 assert(/Qt\.RightButton\) root\.cycleFormat\(\)/.test(widgetSource), 'clock right click cycles the label format')
-assert(/readonly property string activeFormat: configuredFormat/.test(widgetSource), 'clock shows the format it has stored')
+assert(/readonly property string activeFormat: twelveHour\s*\n\s*\? Model\.to12HourFormat\(configuredFormat\)\s*\n\s*: configuredFormat/.test(widgetSource), 'clock shows the format it has stored')
+assert(/setting\("12hr", false\)/.test(widgetSource), 'clock reads the 12-hour override setting')
+assert(/function toggle12hr\(\)/.test(widgetSource) && /entry\["12hr"\] = !root\.twelveHour/.test(widgetSource), 'clock exposes a 12-hour toggle that persists')
+assert(/function toggle12hr\(\): string \{ root\.toggle12hr\(\); return root\.twelveHour \? "true" : "false" \}/.test(widgetSource), 'clock exposes the 12-hour toggle over IPC')
+assert(/function is12hr\(\): string \{ return root\.twelveHour \? "true" : "false" \}/.test(widgetSource), 'clock reports the 12-hour state over IPC')
 assert(/entry\[vertical \? "verticalFormat" : "format"\] = next/.test(widgetSource) && /updateEntryInline/.test(widgetSource), 'clock writes a cycled format back to shell.json')
 assert(!/formatIndex/.test(widgetSource), 'clock keeps no session-only format position')
 assert(/else root\.togglePanel\(\)/.test(widgetSource), 'clock left click reveals the calendar')
@@ -242,3 +261,8 @@ grep -q 'o.bind("SUPER + CTRL + ALT + D", "Calendar", "omarchy-shell shell toggl
   "$ROOT/default/hypr/bindings/utilities.lua" ||
   fail "SUPER+CTRL+ALT+D toggles the calendar panel"
 pass "SUPER+CTRL+ALT+D toggles the calendar panel"
+
+grep -q 'o.bind("SUPER + CTRL + ALT + H", "Toggle 12-hour clock", "omarchy toggle clock 12hr")' \
+  "$ROOT/default/hypr/bindings/utilities.lua" ||
+  fail "SUPER+CTRL+ALT+H toggles the 12-hour clock"
+pass "SUPER+CTRL+ALT+H toggles the 12-hour clock"
