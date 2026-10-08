@@ -42,53 +42,76 @@ exit 0
 STUB
 chmod +x "$stub_dir/omarchy-shell"
 
+commit_plugin() {
+  write_plugin "$remote" "$1"
+  git_quiet "$remote" add .
+  git_quiet "$remote" commit -qm "$1"
+}
+
 # A remote whose default branch and dev branch move independently, so an
 # update that follows the wrong one is visible in the manifest on disk.
 remote="$TMPDIR/remote"
-write_plugin "$remote" "Default v1"
-git -C "$remote" init -q
-git_quiet "$remote" add .
-git_quiet "$remote" commit -qm "Default v1"
+mkdir -p "$remote"
+git -C "$remote" init -q -b master
+commit_plugin "Default v1"
+git_quiet "$remote" tag -a v1 -m v1
 git -C "$remote" checkout -q -b dev
-write_plugin "$remote" "Dev v1"
-git_quiet "$remote" add .
-git_quiet "$remote" commit -qm "Dev v1"
-git -C "$remote" checkout -q -
+commit_plugin "Dev v1"
+git -C "$remote" checkout -q master
 
 test_home="$TMPDIR/home"
 mkdir -p "$test_home/.config/omarchy/plugins"
 installed="$test_home/.config/omarchy/plugins/acme.updatable"
 
-run_update() {
+plugin() {
   HOME="$test_home" OMARCHY_PATH="$ROOT" PATH="$stub_dir:$ROOT/bin:$PATH" \
-    omarchy-plugin-update acme.updatable --yes 2>&1
+    "omarchy-plugin-$1" "${@:2}" --yes 2>&1
+}
+
+installed_name() {
+  jq -r .name "$installed/manifest.json"
 }
 
 # --- a plugin installed from a branch updates from that branch --------------
 
-git clone -q -b dev "$remote" "$installed"
+plugin add "$remote" --branch dev >/dev/null || fail "plugin add --branch dev failed"
 
 git -C "$remote" checkout -q dev
-write_plugin "$remote" "Dev v2"
-git_quiet "$remote" add .
-git_quiet "$remote" commit -qm "Dev v2"
-git -C "$remote" checkout -q -
+commit_plugin "Dev v2"
+git -C "$remote" checkout -q master
+commit_plugin "Default v2"
 
-output=$(run_update) || fail "plugin update failed for a branch checkout" "$output"
-[[ $(jq -r .name "$installed/manifest.json") == "Dev v2" ]] ||
+output=$(plugin update acme.updatable) || fail "plugin update failed for a branch install" "$output"
+[[ $(installed_name) == "Dev v2" ]] ||
   fail "plugin update did not follow the installed branch" "$output"
 pass "plugin update follows the branch the plugin was installed from"
 
-# --- the default-branch case is unchanged -----------------------------------
+# --- a plugin installed from a tag stays on that tag ------------------------
 
 rm -rf "$installed"
-git clone -q "$remote" "$installed"
+plugin add "$remote" --branch v1 >/dev/null || fail "plugin add --branch v1 failed"
 
-write_plugin "$remote" "Default v2"
-git_quiet "$remote" add .
-git_quiet "$remote" commit -qm "Default v2"
+output=$(plugin update acme.updatable) || fail "plugin update failed for a tag install" "$output"
+grep -qF "is up to date" <<<"$output" ||
+  fail "plugin update did not report a tag install as up to date" "$output"
+[[ $(installed_name) == "Default v1" ]] ||
+  fail "plugin update moved a tag install off its tag" "$output"
+pass "plugin update leaves a tag install on its tag"
 
-output=$(run_update) || fail "plugin update failed for a default checkout" "$output"
-[[ $(jq -r .name "$installed/manifest.json") == "Default v2" ]] ||
+# --- a default install follows the remote default, even renamed -------------
+
+rm -rf "$installed"
+plugin add "$remote" >/dev/null || fail "plugin add without --branch failed"
+
+commit_plugin "Default v3"
+output=$(plugin update acme.updatable) || fail "plugin update failed for a default install" "$output"
+[[ $(installed_name) == "Default v3" ]] ||
   fail "plugin update stopped following the default branch" "$output"
-pass "plugin update still follows the default branch when no branch was named"
+pass "plugin update follows the default branch when no branch was named"
+
+git -C "$remote" branch -m master main
+commit_plugin "Default v4"
+output=$(plugin update acme.updatable) || fail "plugin update failed after the default branch was renamed" "$output"
+[[ $(installed_name) == "Default v4" ]] ||
+  fail "plugin update did not follow a renamed default branch" "$output"
+pass "plugin update follows the default branch after it is renamed"

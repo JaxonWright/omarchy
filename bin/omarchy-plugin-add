@@ -145,6 +145,12 @@ if ! git clone "${clone_options[@]}" -- "$url" "$stage"; then
   fail "failed to clone $url${branch:+ at branch '$branch'}"
 fi
 
+# Update fetches this ref instead of the remote's default branch, so a branch
+# install keeps following its branch and a tag install stays on its tag.
+if [[ -n $branch ]]; then
+  git -C "$stage" config omarchy.ref "$branch"
+fi
+
 if ! omarchy-plugin-validate "$stage"; then
   rm -rf "$stage"
   fail "refusing to add: validation failed"
