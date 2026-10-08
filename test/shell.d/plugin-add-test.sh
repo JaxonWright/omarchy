@@ -237,3 +237,11 @@ output=$(add_branch "$branch_remote" --branch) &&
 grep -qF -- "--branch needs a branch name" <<<"$output" ||
   fail "plugin add explains a missing --branch value" "$output"
 pass "plugin add requires a value for --branch"
+
+output=$(add_branch "$branch_remote" --branch "" --yes) &&
+  fail "plugin add accepts an empty --branch" "$output"
+grep -qF -- "--branch needs a branch name" <<<"$output" ||
+  fail "plugin add explains an empty --branch value" "$output"
+[[ ! -e $installed ]] ||
+  fail "plugin add installed the default branch for an empty --branch"
+pass "plugin add rejects an empty --branch"
